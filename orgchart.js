@@ -100,12 +100,38 @@ class OrgChart {
     calculateLayout() {
         const positions = new Map();
         let currentY = 0;
+        let currentX = 0;
         
         // Calculate all positions first
         this.hierarchicalData.forEach((root, rootIndex) => {
-            const rootLayout = this.calculateNodeLayout(root, 0, currentY, 0);
-            this.mergePositions(positions, rootLayout);
-            currentY = Math.max(...Array.from(rootLayout.values()).map(pos => pos.y)) + this.levelHeight;
+            const rootLayout = this.calculateNodeLayout(root, 0, currentY, currentX);
+            
+            // Calculate the width of this root's subtree
+            const rootPositions = Array.from(rootLayout.values());
+            if (rootPositions.length > 0) {
+                const minX = Math.min(...rootPositions.map(pos => pos.x));
+                const maxX = Math.max(...rootPositions.map(pos => pos.x));
+                const subtreeWidth = maxX - minX + this.nodeWidth;
+                
+                // Shift all positions to avoid overlap with previous roots
+                const offsetX = currentX - minX;
+                rootLayout.forEach((pos, nodeId) => {
+                    positions.set(nodeId, {
+                        x: pos.x + offsetX,
+                        y: pos.y,
+                        depth: pos.depth
+                    });
+                });
+                
+                // Update position for next root
+                currentX += subtreeWidth + this.siblingSpacing * 2;
+            } else {
+                this.mergePositions(positions, rootLayout);
+            }
+            
+            // Calculate height for next level
+            const maxY = Math.max(...Array.from(positions.values()).map(pos => pos.y));
+            currentY = maxY + this.levelHeight;
         });
         
         // Calculate bounds to center the chart
@@ -148,7 +174,7 @@ class OrgChart {
         
         if (state.collapsed || !node.children || node.children.length === 0) {
             positions.set(node.id, {
-                x: parentX + depth * this.siblingSpacing,
+                x: parentX,
                 y: startY,
                 depth: depth
             });
@@ -156,29 +182,79 @@ class OrgChart {
         }
         
         const childLayout = state.layout;
-        const nodeX = parentX + depth * this.siblingSpacing;
-        
-        positions.set(node.id, {
-            x: nodeX,
-            y: startY,
-            depth: depth
-        });
         
         if (childLayout === 'horizontal') {
-            // Children spread horizontally
-            const totalWidth = (node.children.length - 1) * this.siblingSpacing;
-            const startX = nodeX - totalWidth / 2;
+            // For horizontal layouts, calculate child subtrees first
             const childY = startY + this.levelHeight;
+            const childSubtrees = [];
+            let totalWidth = 0;
             
+            // Calculate each child's subtree layout
             node.children.forEach((child, index) => {
-                const childX = startX + index * this.siblingSpacing;
-                const childPositions = this.calculateNodeLayout(child, depth + 1, childY, childX - this.siblingSpacing);
-                this.mergePositions(positions, childPositions);
+                const childLayout = this.calculateNodeLayout(child, depth + 1, childY, 0);
+                childSubtrees.push(childLayout);
+                
+                // Calculate subtree width
+                const childPositions = Array.from(childLayout.values());
+                if (childPositions.length > 0) {
+                    const minX = Math.min(...childPositions.map(pos => pos.x));
+                    const maxX = Math.max(...childPositions.map(pos => pos.x));
+                    const subtreeWidth = maxX - minX + this.nodeWidth;
+                    totalWidth += subtreeWidth;
+                    
+                    if (index < node.children.length - 1) {
+                        totalWidth += this.siblingSpacing; // Add spacing between children
+                    }
+                }
             });
+            
+            // Position parent at center of children
+            const nodeX = parentX;
+            positions.set(node.id, {
+                x: nodeX,
+                y: startY,
+                depth: depth
+            });
+            
+            // Position children centered under parent
+            const childrenStartX = nodeX - totalWidth / 2;
+            let currentX = childrenStartX;
+            
+            childSubtrees.forEach((childSubtree, index) => {
+                const childPositions = Array.from(childSubtree.values());
+                if (childPositions.length > 0) {
+                    const minX = Math.min(...childPositions.map(pos => pos.x));
+                    const maxX = Math.max(...childPositions.map(pos => pos.x));
+                    const subtreeWidth = maxX - minX + this.nodeWidth;
+                    
+                    // Center this subtree at currentX + subtreeWidth/2
+                    const subtreeCenterX = currentX + subtreeWidth / 2;
+                    const offsetX = subtreeCenterX - (minX + maxX) / 2;
+                    
+                    // Apply offset to all nodes in this subtree
+                    childSubtree.forEach((pos, nodeId) => {
+                        positions.set(nodeId, {
+                            x: pos.x + offsetX,
+                            y: pos.y,
+                            depth: pos.depth
+                        });
+                    });
+                    
+                    currentX += subtreeWidth + this.siblingSpacing;
+                }
+            });
+            
         } else {
-            // Children stacked vertically
+            // Vertical layout - children stacked vertically
             let currentChildY = startY + this.levelHeight;
-            const childX = nodeX + this.siblingSpacing * 0.5; // Offset children to the right
+            const childX = parentX + this.siblingSpacing * 0.5;
+            
+            // Set parent position first
+            positions.set(node.id, {
+                x: parentX,
+                y: startY,
+                depth: depth
+            });
             
             node.children.forEach(child => {
                 const childPositions = this.calculateNodeLayout(child, depth, currentChildY, childX);
@@ -187,7 +263,7 @@ class OrgChart {
                 // Calculate height of this subtree to properly space the next child
                 const subtreePositions = Array.from(childPositions.values());
                 const maxY = Math.max(...subtreePositions.map(pos => pos.y));
-                currentChildY = maxY + this.nodeHeight + 30; // Add extra spacing between vertically stacked items
+                currentChildY = maxY + this.nodeHeight + 30;
             });
         }
         
@@ -415,29 +491,20 @@ class OrgChart {
                     L${routingX},${target.y}
                     L${targetLeft},${target.y}`;
         } else {
-            // Horizontal layout - children spread horizontally
+            // Horizontal layout - shared horizontal line with drops to children
             const sourceBottom = source.y + this.nodeHeight / 2;
             const targetTop = target.y - this.nodeHeight / 2;
             const sourceCenter = source.x;
             const targetCenter = target.x;
             
-            // Calculate routing Y with channel offset
-            const baseRoutingY = sourceBottom + connectionOffset;
-            const routingY = baseRoutingY + channelInfo.channelOffset;
+            // For horizontal layouts, use a shared horizontal line
+            const sharedY = sourceBottom + connectionOffset;
             
-            if (Math.abs(sourceCenter - targetCenter) < this.nodeWidth / 2) {
-                // Direct vertical connection for nodes nearly aligned
-                return `M${sourceCenter},${sourceBottom}
-                        L${sourceCenter},${routingY}
-                        L${targetCenter},${routingY}
-                        L${targetCenter},${targetTop}`;
-            } else {
-                // Standard horizontal routing with channel separation
-                return `M${sourceCenter},${sourceBottom}
-                        L${sourceCenter},${routingY}
-                        L${targetCenter},${routingY}
-                        L${targetCenter},${targetTop}`;
-            }
+            // Create path: down from parent, along shared horizontal line, then down to child
+            return `M${sourceCenter},${sourceBottom}
+                    L${sourceCenter},${sharedY}
+                    L${targetCenter},${sharedY}
+                    L${targetCenter},${targetTop}`;
         }
     }
     
@@ -454,19 +521,15 @@ class OrgChart {
             const parentState = this.layoutStates.get(link.source.id);
             
             if (parentState.layout === 'horizontal') {
-                // For horizontal layouts, group by source node
-                const regionKey = `h_${link.source.id}`;
-                if (!linksByRegion.has(regionKey)) {
-                    linksByRegion.set(regionKey, []);
-                }
-                linksByRegion.get(regionKey).push({
-                    link,
-                    sourcePos,
-                    targetPos,
-                    sortKey: targetPos.x // Sort by target X position
+                // For horizontal layouts, all children from same parent share same routing
+                // No channel offset needed since they use a shared horizontal line
+                channels.set(`${link.source.id}-${link.target.id}`, {
+                    channelOffset: 0,
+                    channelIndex: 0,
+                    totalChannels: 1
                 });
             } else {
-                // For vertical layouts, group by Y range
+                // For vertical layouts, group by Y range and assign separate channels
                 const minY = Math.min(sourcePos.y, targetPos.y);
                 const maxY = Math.max(sourcePos.y, targetPos.y);
                 const regionKey = `v_${Math.floor(minY / 100)}_${Math.floor(maxY / 100)}`;
@@ -482,7 +545,7 @@ class OrgChart {
             }
         });
         
-        // Assign channels within each region
+        // Assign channels within each vertical region
         linksByRegion.forEach((regionLinks, regionKey) => {
             // Sort links within region
             regionLinks.sort((a, b) => a.sortKey - b.sortKey);
