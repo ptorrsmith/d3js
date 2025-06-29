@@ -185,29 +185,8 @@ class OrgChart {
         const childLayout = state.layout;
         
         if (childLayout === 'horizontal') {
-            // For horizontal layouts, calculate child subtrees first
+            // For horizontal layouts, check if there's only one child for special handling
             const childY = startY + this.levelHeight;
-            const childSubtrees = [];
-            let totalWidth = 0;
-            
-            // Calculate each child's subtree layout
-            node.children.forEach((child, index) => {
-                const childLayout = this.calculateNodeLayout(child, depth + 1, childY, 0, 'horizontal');
-                childSubtrees.push(childLayout);
-                
-                // Calculate subtree width
-                const childPositions = Array.from(childLayout.values());
-                if (childPositions.length > 0) {
-                    const minX = Math.min(...childPositions.map(pos => pos.x));
-                    const maxX = Math.max(...childPositions.map(pos => pos.x));
-                    const subtreeWidth = maxX - minX + this.nodeWidth;
-                    totalWidth += subtreeWidth;
-                    
-                    if (index < node.children.length - 1) {
-                        totalWidth += this.siblingSpacing; // Add spacing between children
-                    }
-                }
-            });
             
             // Position parent - if parent layout is vertical, shift to accommodate horizontal children
             let nodeX = parentX;
@@ -222,54 +201,84 @@ class OrgChart {
                 depth: depth
             });
             
-            // Position children - start from the left edge of the horizontal group
-            let childrenStartX;
-            if (parentLayout === 'vertical') {
-                // When parent is vertical, start children to the right to avoid the vertical connecting line
-                childrenStartX = nodeX - totalWidth / 2;
-                // Ensure children don't go too far left and overlap the vertical line
-                const minAllowedX = parentX + this.siblingSpacing;
-                if (childrenStartX < minAllowedX) {
-                    const adjustment = minAllowedX - childrenStartX;
-                    childrenStartX = minAllowedX;
-                    // Also adjust the parent node position
-                    nodeX += adjustment;
-                    positions.set(node.id, {
-                        x: nodeX,
-                        y: startY,
-                        depth: depth
-                    });
-                }
+            // Handle single child case - position directly under parent
+            if (node.children.length === 1) {
+                const child = node.children[0];
+                const childPositions = this.calculateNodeLayout(child, depth + 1, childY, nodeX, 'horizontal');
+                this.mergePositions(positions, childPositions);
             } else {
-                // Normal horizontal centering under parent
-                childrenStartX = nodeX - totalWidth / 2;
-            }
-            
-            let currentX = childrenStartX;
-            
-            childSubtrees.forEach((childSubtree, index) => {
-                const childPositions = Array.from(childSubtree.values());
-                if (childPositions.length > 0) {
-                    const minX = Math.min(...childPositions.map(pos => pos.x));
-                    const maxX = Math.max(...childPositions.map(pos => pos.x));
-                    const subtreeWidth = maxX - minX + this.nodeWidth;
+                // Multiple children - use the complex positioning logic
+                const childSubtrees = [];
+                let totalWidth = 0;
+                
+                // Calculate each child's subtree layout
+                node.children.forEach((child, index) => {
+                    const childLayout = this.calculateNodeLayout(child, depth + 1, childY, 0, 'horizontal');
+                    childSubtrees.push(childLayout);
                     
-                    // Center this subtree at currentX + subtreeWidth/2
-                    const subtreeCenterX = currentX + subtreeWidth / 2;
-                    const offsetX = subtreeCenterX - (minX + maxX) / 2;
-                    
-                    // Apply offset to all nodes in this subtree
-                    childSubtree.forEach((pos, nodeId) => {
-                        positions.set(nodeId, {
-                            x: pos.x + offsetX,
-                            y: pos.y,
-                            depth: pos.depth
+                    // Calculate subtree width
+                    const childPositions = Array.from(childLayout.values());
+                    if (childPositions.length > 0) {
+                        const minX = Math.min(...childPositions.map(pos => pos.x));
+                        const maxX = Math.max(...childPositions.map(pos => pos.x));
+                        const subtreeWidth = maxX - minX + this.nodeWidth;
+                        totalWidth += subtreeWidth;
+                        
+                        if (index < node.children.length - 1) {
+                            totalWidth += this.siblingSpacing; // Add spacing between children
+                        }
+                    }
+                });
+                
+                // Position children - start from the left edge of the horizontal group
+                let childrenStartX;
+                if (parentLayout === 'vertical') {
+                    // When parent is vertical, start children to the right to avoid the vertical connecting line
+                    childrenStartX = nodeX - totalWidth / 2;
+                    // Ensure children don't go too far left and overlap the vertical line
+                    const minAllowedX = parentX + this.siblingSpacing;
+                    if (childrenStartX < minAllowedX) {
+                        const adjustment = minAllowedX - childrenStartX;
+                        childrenStartX = minAllowedX;
+                        // Also adjust the parent node position
+                        nodeX += adjustment;
+                        positions.set(node.id, {
+                            x: nodeX,
+                            y: startY,
+                            depth: depth
                         });
-                    });
-                    
-                    currentX += subtreeWidth + this.siblingSpacing;
+                    }
+                } else {
+                    // Normal horizontal centering under parent
+                    childrenStartX = nodeX - totalWidth / 2;
                 }
-            });
+                
+                let currentX = childrenStartX;
+                
+                childSubtrees.forEach((childSubtree, index) => {
+                    const childPositions = Array.from(childSubtree.values());
+                    if (childPositions.length > 0) {
+                        const minX = Math.min(...childPositions.map(pos => pos.x));
+                        const maxX = Math.max(...childPositions.map(pos => pos.x));
+                        const subtreeWidth = maxX - minX + this.nodeWidth;
+                        
+                        // Center this subtree at currentX + subtreeWidth/2
+                        const subtreeCenterX = currentX + subtreeWidth / 2;
+                        const offsetX = subtreeCenterX - (minX + maxX) / 2;
+                        
+                        // Apply offset to all nodes in this subtree
+                        childSubtree.forEach((pos, nodeId) => {
+                            positions.set(nodeId, {
+                                x: pos.x + offsetX,
+                                y: pos.y,
+                                depth: pos.depth
+                            });
+                        });
+                        
+                        currentX += subtreeWidth + this.siblingSpacing;
+                    }
+                });
+            }
             
         } else {
             // Vertical layout - children stacked vertically
@@ -529,20 +538,33 @@ class OrgChart {
                     L${mainVerticalX},${targetCenter}
                     L${targetLeft},${targetCenter}`;
         } else {
-            // Horizontal layout - shared horizontal line with drops to children
+            // Horizontal layout - check if parent has only one child
             const sourceBottom = source.y + this.nodeHeight / 2;
             const targetTop = target.y - this.nodeHeight / 2;
             const sourceCenter = source.x;
             const targetCenter = target.x;
             
-            // For horizontal layouts, use a shared horizontal line
-            const sharedY = sourceBottom + connectionOffset;
+            // Check if parent has only one child for direct connection
+            const parentChildren = sourceNode.children || [];
+            const visibleChildren = parentChildren.filter(child => {
+                const childState = this.layoutStates.get(child.id);
+                return !childState.collapsed;
+            });
             
-            // Create path: down from parent, along shared horizontal line, then down to child
-            return `M${sourceCenter},${sourceBottom}
-                    L${sourceCenter},${sharedY}
-                    L${targetCenter},${sharedY}
-                    L${targetCenter},${targetTop}`;
+            if (visibleChildren.length === 1) {
+                // Single child - direct line from parent bottom to child top
+                return `M${sourceCenter},${sourceBottom}
+                        L${targetCenter},${targetTop}`;
+            } else {
+                // Multiple children - use shared horizontal line
+                const sharedY = sourceBottom + connectionOffset;
+                
+                // Create path: down from parent, along shared horizontal line, then down to child
+                return `M${sourceCenter},${sourceBottom}
+                        L${sourceCenter},${sharedY}
+                        L${targetCenter},${sharedY}
+                        L${targetCenter},${targetTop}`;
+            }
         }
     }
     
