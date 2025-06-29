@@ -478,18 +478,20 @@ class OrgChart {
         const connectionOffset = 15;
         
         if (parentState && parentState.layout === 'vertical') {
-            // Vertical layout - children stacked vertically
-            const sourceRight = source.x + this.nodeWidth / 2;
+            // Vertical layout - main vertical line with short horizontal branches to children
+            const sourceBottom = source.y + this.nodeHeight / 2;
+            const sourceCenter = source.x;
             const targetLeft = target.x - this.nodeWidth / 2;
+            const targetCenter = target.y;
             
-            // Use channel offset to avoid overlaps
-            const routingX = Math.max(sourceRight, target.x + this.nodeWidth / 2) + 
-                           connectionOffset + channelInfo.channelOffset;
+            // Main vertical line goes straight down from parent center
+            // Short horizontal branch connects to left side of child
+            const mainVerticalX = sourceCenter;
             
-            return `M${sourceRight},${source.y}
-                    L${routingX},${source.y}
-                    L${routingX},${target.y}
-                    L${targetLeft},${target.y}`;
+            // Path: down from parent center to child level, then right to child's left side
+            return `M${sourceCenter},${sourceBottom}
+                    L${mainVerticalX},${targetCenter}
+                    L${targetLeft},${targetCenter}`;
         } else {
             // Horizontal layout - shared horizontal line with drops to children
             const sourceBottom = source.y + this.nodeHeight / 2;
