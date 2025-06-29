@@ -82,19 +82,24 @@ class OrgChart {
     }
     
     initializeLayoutStates(nodes) {
-        const traverse = (node) => {
-            // Default to horizontal layout, but can be toggled
+        const traverse = (node, depth = 0) => {
+            // Set default layout based on depth:
+            // - Root nodes (depth 0): horizontal layout for their children
+            // - First level children (depth 1): horizontal layout for their children  
+            // - Deeper levels (depth 2+): vertical layout for their children
+            const defaultLayout = depth <= 0 ? 'horizontal' : 'vertical';
+            
             this.layoutStates.set(node.id, {
-                layout: 'horizontal', // or 'vertical'
+                layout: defaultLayout,
                 collapsed: false
             });
             
             if (node.children) {
-                node.children.forEach(traverse);
+                node.children.forEach(child => traverse(child, depth + 1));
             }
         };
         
-        nodes.forEach(traverse);
+        nodes.forEach(root => traverse(root));
     }
     
     calculateLayout() {
