@@ -99,12 +99,12 @@ class OrgChart {
     
     calculateLayout() {
         const positions = new Map();
-        let currentY = 0;
+        const rootY = 0; // All roots at same Y level
         let currentX = 0;
         
-        // Calculate all positions first
+        // Calculate all positions first - all roots at same Y level
         this.hierarchicalData.forEach((root, rootIndex) => {
-            const rootLayout = this.calculateNodeLayout(root, 0, currentY, currentX);
+            const rootLayout = this.calculateNodeLayout(root, 0, rootY, currentX);
             
             // Calculate the width of this root's subtree
             const rootPositions = Array.from(rootLayout.values());
@@ -123,15 +123,11 @@ class OrgChart {
                     });
                 });
                 
-                // Update position for next root
+                // Update X position for next root (keep Y the same)
                 currentX += subtreeWidth + this.siblingSpacing * 2;
             } else {
                 this.mergePositions(positions, rootLayout);
             }
-            
-            // Calculate height for next level
-            const maxY = Math.max(...Array.from(positions.values()).map(pos => pos.y));
-            currentY = maxY + this.levelHeight;
         });
         
         // Calculate bounds to center the chart
