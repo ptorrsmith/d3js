@@ -143,20 +143,71 @@
             pointer-events: none;
             z-index: 1000;
         }
+        
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+            z-index: 100;
+        }
+        
+        .control-icon {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #007bff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #007bff;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-icon:hover {
+            background: #007bff;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .control-icon.separator {
+            width: 2px;
+            height: 36px;
+            background: #ddd;
+            border: none;
+            cursor: default;
+        }
+        
+        .control-icon.separator:hover {
+            transform: none;
+            background: #ddd;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Dynamic Org Chart</h1>
         <div class="controls">
-            <button onclick="expandAll()">Expand All</button>
-            <button onclick="collapseAll()">Collapse All</button>
-            <button onclick="resetView()">Reset View</button>
-            <button onclick="setAllSubNodesVertical()">All Sub-nodes Vertical</button>
-            <button onclick="setAllSubNodesHorizontal()">All Sub-nodes Horizontal</button>
+            <!-- Control buttons moved to canvas overlay -->
         </div>
         <div class="chart-container">
             <svg id="chart"></svg>
+            <div class="control-panel">
+                <div class="control-icon" onclick="expandAll()" title="Expand All">⊞</div>
+                <div class="control-icon" onclick="collapseAll()" title="Collapse All">⊟</div>
+                <div class="control-icon separator"></div>
+                <div class="control-icon" onclick="setAllSubNodesVertical()" title="All Sub-nodes Vertical">⫿</div>
+                <div class="control-icon" onclick="setAllSubNodesHorizontal()" title="All Sub-nodes Horizontal">▬</div>
+                <div class="control-icon separator"></div>
+                <div class="control-icon" onclick="resetView()" title="Reset View">⌂</div>
+            </div>
         </div>
     </div>
     

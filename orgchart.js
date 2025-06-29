@@ -15,6 +15,7 @@ class OrgChart {
         this.g = this.svg.append('g');
             
         this.tooltip = d3.select('#tooltip');
+        this.tooltipTimeout = null; // For delayed tooltip display
         
         // Add zoom behavior
         this.zoom = d3.zoom()
@@ -472,7 +473,7 @@ class OrgChart {
         });
         
         nodeUpdate.on('mouseover', (event, d) => {
-            this.showTooltip(event, d);
+            this.showTooltipDelayed(event, d);
         });
         
         nodeUpdate.on('mouseout', () => {
@@ -761,6 +762,18 @@ class OrgChart {
             .call(this.zoom.transform, transform);
     }
     
+    showTooltipDelayed(event, d) {
+        // Clear any existing timeout
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+        }
+        
+        // Set a new timeout to show tooltip after 2 seconds
+        this.tooltipTimeout = setTimeout(() => {
+            this.showTooltip(event, d);
+        }, 2000);
+    }
+    
     showTooltip(event, d) {
         this.tooltip
             .style('display', 'block')
@@ -774,6 +787,12 @@ class OrgChart {
     }
     
     hideTooltip() {
+        // Clear any pending tooltip timeout
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
+        
         this.tooltip.style('display', 'none');
     }
     
