@@ -152,6 +152,8 @@
             <button onclick="expandAll()">Expand All</button>
             <button onclick="collapseAll()">Collapse All</button>
             <button onclick="resetView()">Reset View</button>
+            <button onclick="setAllSubNodesVertical()">All Sub-nodes Vertical</button>
+            <button onclick="setAllSubNodesHorizontal()">All Sub-nodes Horizontal</button>
         </div>
         <div class="chart-container">
             <svg id="chart"></svg>
@@ -183,6 +185,14 @@
         
         function resetView() {
             if (chart) chart.resetView();
+        }
+        
+        function setAllSubNodesVertical() {
+            if (chart) chart.setAllSubNodesLayout('vertical');
+        }
+        
+        function setAllSubNodesHorizontal() {
+            if (chart) chart.setAllSubNodesLayout('horizontal');
         }
     </script>
 </body>

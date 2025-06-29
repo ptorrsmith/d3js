@@ -84,10 +84,9 @@ class OrgChart {
     initializeLayoutStates(nodes) {
         const traverse = (node, depth = 0) => {
             // Set default layout based on depth:
-            // - Root nodes (depth 0): horizontal layout for their children
-            // - First level children (depth 1): horizontal layout for their children  
-            // - Deeper levels (depth 2+): vertical layout for their children
-            const defaultLayout = depth <= 0 ? 'horizontal' : 'vertical';
+            // - Root nodes (depth 0): horizontal layout (arrange their children horizontally)
+            // - Level 1+ nodes (depth 1+): vertical layout (arrange their children vertically)
+            const defaultLayout = depth === 0 ? 'horizontal' : 'vertical';
             
             this.layoutStates.set(node.id, {
                 layout: defaultLayout,
@@ -183,6 +182,7 @@ class OrgChart {
         }
         
         const childLayout = state.layout;
+        console.log(`Node ${node.id} (${node.title}) using layout: ${childLayout}, depth: ${depth} - Visual: ${childLayout === 'horizontal' ? 'children side-by-side' : 'children stacked vertically'}`); // Debug log
         
         if (childLayout === 'horizontal') {
             // For horizontal layouts, check if there's only one child for special handling
@@ -818,5 +818,34 @@ class OrgChart {
         }
         
         return lines;
+    }
+    
+    setAllSubNodesLayout(layout) {
+        // Recursively set layout for Level 1+ nodes (excluding root nodes)
+        const setLayoutRecursive = (node, depth) => {
+            // Only change nodes at depth 1 and beyond (Level 1+ nodes)
+            // Root nodes (depth 0) remain unchanged (always horizontal)
+            // Level 1+ nodes get set to the specified layout
+            if (depth >= 1) {
+                const state = this.layoutStates.get(node.id);
+                if (state) {
+                    state.layout = layout;
+                }
+            }
+            
+            // Recursively process children
+            if (node.children && node.children.length > 0) {
+                node.children.forEach(child => {
+                    setLayoutRecursive(child, depth + 1);
+                });
+            }
+        };
+        
+        // Process all root nodes and their hierarchies, starting at depth 0
+        this.hierarchicalData.forEach(rootNode => {
+            setLayoutRecursive(rootNode, 0);
+        });
+        
+        this.update();
     }
 }
