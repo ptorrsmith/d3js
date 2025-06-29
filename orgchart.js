@@ -3,10 +3,10 @@ class OrgChart {
         this.containerId = containerId;
         this.originalData = data;
         this.margin = { top: 40, right: 40, bottom: 40, left: 40 };
-        this.nodeWidth = 160;
-        this.nodeHeight = 60;
-        this.levelHeight = 120;
-        this.siblingSpacing = 180;
+        this.nodeWidth = 200;
+        this.nodeHeight = 110;
+        this.levelHeight = 150; // Increased from 120 to accommodate taller nodes
+        this.siblingSpacing = 220; // Increased from 180 to accommodate wider nodes
         
         this.svg = d3.select(`#${containerId}`)
             .attr('width', '100%')
@@ -308,7 +308,7 @@ class OrgChart {
                 // Calculate height of this subtree to properly space the next child
                 const subtreePositions = Array.from(childPositions.values());
                 const maxY = Math.max(...subtreePositions.map(pos => pos.y));
-                currentChildY = maxY + this.nodeHeight + 30;
+                currentChildY = maxY + this.nodeHeight + 50; // Increased spacing for larger nodes
             });
         }
         
@@ -357,18 +357,39 @@ class OrgChart {
             .attr('x', -this.nodeWidth / 2)
             .attr('y', -this.nodeHeight / 2);
             
-        // Add main text
+        // Add main text (title)
         nodeEnter.append('text')
             .attr('class', 'title')
-            .attr('dy', '-0.5em')
-            .text(d => this.truncateText(d.title, 20));
+            .attr('dy', '-1.2em')
+            .attr('font-weight', 'bold')
+            .attr('font-size', '12px')
+            .text(d => this.truncateText(d.title, 25));
             
-        // Add subtitle
+        // Add description text (multi-line)
+        const descriptionGroup = nodeEnter.append('g')
+            .attr('class', 'description-group');
+            
+        descriptionGroup.each((d, i, nodes) => {
+            const group = d3.select(nodes[i]);
+            const descriptionLines = this.wrapText(d.description || '', 25, 3);
+            
+            descriptionLines.forEach((line, lineIndex) => {
+                group.append('text')
+                    .attr('class', 'description')
+                    .attr('dy', `${0.3 + lineIndex * 1.2}em`)
+                    .attr('font-size', '10px')
+                    .attr('fill', '#666')
+                    .attr('text-anchor', 'middle')
+                    .text(line);
+            });
+        });
+            
+        // Add subtitle (child count)
         nodeEnter.append('text')
             .attr('class', 'subtitle')
-            .attr('dy', '1em')
-            .attr('font-size', '10px')
-            .attr('fill', '#666')
+            .attr('dy', '4.5em')
+            .attr('font-size', '9px')
+            .attr('fill', '#999')
             .text(d => d.children && d.children.length > 0 ? `${d.children.length} items` : '');
             
         // Add layout toggle button for nodes with children
@@ -520,7 +541,7 @@ class OrgChart {
         const linkKey = `${sourceNode.id}-${targetNode.id}`;
         const channelInfo = this.routingChannels.get(linkKey) || { channelOffset: 0, channelIndex: 0 };
         
-        const connectionOffset = 15;
+        const connectionOffset = 25; // Increased for better visual separation with larger nodes
         
         if (parentState && parentState.layout === 'vertical') {
             // Vertical layout - main vertical line with short horizontal branches to children
@@ -760,45 +781,42 @@ class OrgChart {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     }
     
-    calculateNodeWidth(node) {
-        // Base width
-        let width = this.nodeWidth;
+    wrapText(text, maxCharsPerLine, maxLines = 3) {
+        if (!text) return [];
         
-        // Calculate text width (approximate)
-        const titleLength = node.title.length;
-        const minWidth = 120;
-        const maxWidth = 250;
+        const words = text.split(' ');
+        const lines = [];
+        let currentLine = '';
         
-        // Rough estimation: 8 pixels per character
-        const estimatedWidth = Math.max(minWidth, Math.min(maxWidth, titleLength * 8 + 40));
+        for (const word of words) {
+            const testLine = currentLine ? `${currentLine} ${word}` : word;
+            
+            if (testLine.length <= maxCharsPerLine) {
+                currentLine = testLine;
+            } else {
+                if (currentLine) {
+                    lines.push(currentLine);
+                    if (lines.length >= maxLines) break;
+                }
+                currentLine = word;
+            }
+        }
         
-        return estimatedWidth;
+        // Add the last line if there's content and we haven't exceeded max lines
+        if (currentLine && lines.length < maxLines) {
+            lines.push(currentLine);
+        }
+        
+        // If we truncated, add ellipsis to the last line
+        if (lines.length === maxLines && words.length > lines.join(' ').split(' ').length) {
+            const lastLine = lines[lines.length - 1];
+            if (lastLine.length > maxCharsPerLine - 3) {
+                lines[lines.length - 1] = lastLine.substring(0, maxCharsPerLine - 3) + '...';
+            } else {
+                lines[lines.length - 1] = lastLine + '...';
+            }
+        }
+        
+        return lines;
     }
-}
-
-// Initialize the chart when the page loads
-let chart;
-
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const response = await fetch('sampledata.json');
-        const data = await response.json();
-        
-        chart = new OrgChart('chart', data);
-    } catch (error) {
-        console.error('Error loading data:', error);
-    }
-});
-
-// Global functions for buttons
-function expandAll() {
-    if (chart) chart.expandAll();
-}
-
-function collapseAll() {
-    if (chart) chart.collapseAll();
-}
-
-function resetView() {
-    if (chart) chart.resetView();
 }

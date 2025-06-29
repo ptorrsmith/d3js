@@ -79,6 +79,21 @@
             pointer-events: none;
         }
         
+        .node text.title {
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .node text.description {
+            font-size: 10px;
+            fill: #666;
+        }
+        
+        .node text.subtitle {
+            font-size: 9px;
+            fill: #999;
+        }
+        
         .node.has-children rect {
             stroke: #28a745;
         }
@@ -146,5 +161,29 @@
     <div class="tooltip" id="tooltip" style="display: none;"></div>
     
     <script src="orgchart.js"></script>
+    <script>
+        let chart;
+        
+        // Load the data and initialize the chart
+        d3.json('sampledata.json').then(data => {
+            console.log('Loaded data:', data);
+            chart = new OrgChart('chart', data);
+        }).catch(error => {
+            console.error('Error loading data:', error);
+        });
+        
+        // Global functions for the control buttons
+        function expandAll() {
+            if (chart) chart.expandAll();
+        }
+        
+        function collapseAll() {
+            if (chart) chart.collapseAll();
+        }
+        
+        function resetView() {
+            if (chart) chart.resetView();
+        }
+    </script>
 </body>
 </html>
