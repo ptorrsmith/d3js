@@ -109,7 +109,7 @@ class OrgChart {
         
         // Calculate all positions first - all roots at same Y level
         this.hierarchicalData.forEach((root, rootIndex) => {
-            const rootLayout = this.calculateNodeLayout(root, 0, rootY, currentX);
+            const rootLayout = this.calculateNodeLayout(root, 0, rootY, currentX, null);
             
             // Calculate the width of this root's subtree
             const rootPositions = Array.from(rootLayout.values());
@@ -169,7 +169,7 @@ class OrgChart {
         return centeredPositions;
     }
     
-    calculateNodeLayout(node, depth, startY, parentX) {
+    calculateNodeLayout(node, depth, startY, parentX, parentLayout = null) {
         const positions = new Map();
         const state = this.layoutStates.get(node.id);
         
@@ -192,7 +192,7 @@ class OrgChart {
             
             // Calculate each child's subtree layout
             node.children.forEach((child, index) => {
-                const childLayout = this.calculateNodeLayout(child, depth + 1, childY, 0);
+                const childLayout = this.calculateNodeLayout(child, depth + 1, childY, 0, 'horizontal');
                 childSubtrees.push(childLayout);
                 
                 // Calculate subtree width
@@ -209,16 +209,42 @@ class OrgChart {
                 }
             });
             
-            // Position parent at center of children
-            const nodeX = parentX;
+            // Position parent - if parent layout is vertical, shift to accommodate horizontal children
+            let nodeX = parentX;
+            if (parentLayout === 'vertical') {
+                // When coming from vertical parent, position this node to the right to avoid vertical line overlap
+                nodeX = parentX + this.siblingSpacing * 1.5;
+            }
+            
             positions.set(node.id, {
                 x: nodeX,
                 y: startY,
                 depth: depth
             });
             
-            // Position children centered under parent
-            const childrenStartX = nodeX - totalWidth / 2;
+            // Position children - start from the left edge of the horizontal group
+            let childrenStartX;
+            if (parentLayout === 'vertical') {
+                // When parent is vertical, start children to the right to avoid the vertical connecting line
+                childrenStartX = nodeX - totalWidth / 2;
+                // Ensure children don't go too far left and overlap the vertical line
+                const minAllowedX = parentX + this.siblingSpacing;
+                if (childrenStartX < minAllowedX) {
+                    const adjustment = minAllowedX - childrenStartX;
+                    childrenStartX = minAllowedX;
+                    // Also adjust the parent node position
+                    nodeX += adjustment;
+                    positions.set(node.id, {
+                        x: nodeX,
+                        y: startY,
+                        depth: depth
+                    });
+                }
+            } else {
+                // Normal horizontal centering under parent
+                childrenStartX = nodeX - totalWidth / 2;
+            }
+            
             let currentX = childrenStartX;
             
             childSubtrees.forEach((childSubtree, index) => {
@@ -248,7 +274,7 @@ class OrgChart {
         } else {
             // Vertical layout - children stacked vertically
             let currentChildY = startY + this.levelHeight;
-            const childX = parentX + this.siblingSpacing * 0.5;
+            const baseChildX = parentX + this.siblingSpacing * 0.5;
             
             // Set parent position first
             positions.set(node.id, {
@@ -258,7 +284,16 @@ class OrgChart {
             });
             
             node.children.forEach(child => {
-                const childPositions = this.calculateNodeLayout(child, depth, currentChildY, childX);
+                const childState = this.layoutStates.get(child.id);
+                
+                // If child will use horizontal layout for its children, shift it further right
+                // to avoid overlapping with the parent's vertical connecting line
+                let childX = baseChildX;
+                if (childState && childState.layout === 'horizontal' && child.children && child.children.length > 0) {
+                    childX = baseChildX + this.siblingSpacing * 0.5; // Additional spacing for horizontal children
+                }
+                
+                const childPositions = this.calculateNodeLayout(child, depth, currentChildY, childX, 'vertical');
                 this.mergePositions(positions, childPositions);
                 
                 // Calculate height of this subtree to properly space the next child
