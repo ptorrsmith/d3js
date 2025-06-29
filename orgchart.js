@@ -655,6 +655,22 @@ class OrgChart {
         return links;
     }
     
+    getNodeStyle(node) {
+        const styles = {
+            action: { fill: '#e3f2fd', stroke: '#1976d2', strokeWidth: 2 },
+            task: { fill: '#f3e5f5', stroke: '#7b1fa2', strokeWidth: 1 },
+            milestone: { fill: '#fff3e0', stroke: '#f57c00', strokeWidth: 2 },
+            review: { fill: '#e8f5e8', stroke: '#388e3c', strokeWidth: 1 },
+            strategy: { fill: '#fce4ec', stroke: '#c2185b', strokeWidth: 3 },
+            initiative: { fill: '#e0f2f1', stroke: '#00796b', strokeWidth: 2 },
+            goal: { fill: '#fff8e1', stroke: '#fbc02d', strokeWidth: 1 },
+            objective: { fill: '#f1f8e9', stroke: '#689f38', strokeWidth: 1 },
+            default: { fill: '#f5f5f5', stroke: '#757575', strokeWidth: 1 }
+        };
+        
+        return styles[node.type] || styles.default;
+    }
+    
     toggleLayout(nodeId) {
         console.log('Toggling layout for node:', nodeId); // Debug log
         const state = this.layoutStates.get(nodeId);
@@ -742,6 +758,21 @@ class OrgChart {
     
     truncateText(text, maxLength) {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
+    
+    calculateNodeWidth(node) {
+        // Base width
+        let width = this.nodeWidth;
+        
+        // Calculate text width (approximate)
+        const titleLength = node.title.length;
+        const minWidth = 120;
+        const maxWidth = 250;
+        
+        // Rough estimation: 8 pixels per character
+        const estimatedWidth = Math.max(minWidth, Math.min(maxWidth, titleLength * 8 + 40));
+        
+        return estimatedWidth;
     }
 }
 
